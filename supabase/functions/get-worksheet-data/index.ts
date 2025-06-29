@@ -3,9 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length, Content-Type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
@@ -15,9 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url)
-    const worksheetId = url.searchParams.get('worksheetId')
-    const streamPdf = url.searchParams.get('stream') === 'pdf'
+    const { worksheetId } = await req.json()
 
     if (!worksheetId) {
       return new Response(
@@ -33,84 +29,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // If streaming PDF is requested, handle PDF streaming
-    if (streamPdf) {
-      try {
-        // Get PDF from storage
-        const { data: pdfData, error: storageError } = await supabase.storage
-          .from('pdfs')
-          .download(`${worksheetId}.pdf`)
-
-        if (storageError || !pdfData) {
-          console.error('PDF download error:', storageError)
-          return new Response(
-            JSON.stringify({ error: 'PDF file not found' }),
-            { 
-              status: 404, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
-        }
-
-        // Convert blob to array buffer
-        const arrayBuffer = await pdfData.arrayBuffer()
-        const contentLength = arrayBuffer.byteLength
-
-        // Handle Range requests for progressive loading
-        const rangeHeader = req.headers.get('range')
-        
-        if (rangeHeader) {
-          const ranges = rangeHeader.replace(/bytes=/, '').split('-')
-          const start = parseInt(ranges[0], 10)
-          const end = ranges[1] ? parseInt(ranges[1], 10) : contentLength - 1
-          const chunkSize = (end - start) + 1
-
-          const chunk = arrayBuffer.slice(start, end + 1)
-
-          return new Response(chunk, {
-            status: 206, // Partial Content
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/pdf',
-              'Content-Range': `bytes ${start}-${end}/${contentLength}`,
-              'Accept-Ranges': 'bytes',
-              'Content-Length': chunkSize.toString(),
-              'Cache-Control': 'public, max-age=3600',
-            }
-          })
-        } else {
-          // Return full PDF
-          return new Response(arrayBuffer, {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/pdf',
-              'Content-Length': contentLength.toString(),
-              'Accept-Ranges': 'bytes',
-              'Cache-Control': 'public, max-age=3600',
-            }
-          })
-        }
-      } catch (error) {
-        console.error('PDF streaming error:', error)
-        return new Response(
-          JSON.stringify({ error: 'Failed to stream PDF' }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-    }
-
-    // Handle metadata requests (existing logic)
-    let requestData
-    if (req.method === 'POST') {
-      requestData = await req.json()
-    } else {
-      requestData = { worksheetId }
-    }
 
     // Fetch document metadata from 'documents' table
     const { data: document, error: documentError } = await supabase
@@ -148,11 +66,33 @@ serve(async (req) => {
       )
     }
 
-    // Construct streaming PDF URL
-    const streamingPdfUrl = `${supabaseUrl}/functions/v1/get-worksheet-data?worksheetId=${worksheetId}&stream=pdf`
+    // Get PDF URL from 'pdfs' storage bucket with 24 hour expiry
+    const { data: pdfData, error: storageError } = await supabase.storage
+      .from('pdfs')
+      .createSignedUrl(`${worksheetId}.pdf`, 86400) // 24 hours expiry
+
+    let pdfUrl = null
+    if (pdfData?.signedUrl && !storageError) {
+      pdfUrl = pdfData.signedUrl
+    }
+
+    // If no signed URL could be generated, pdfUrl remains null
+    if (!pdfUrl) {
+      console.warn(`PDF file not found in storage for worksheet: ${worksheetId}`)
+      return new Response(
+        JSON.stringify({ error: 'PDF file not found' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
     // DRM protection logic: Only use drm_protected_pages array
+    // The is_private flag is ignored for DRM protection
     const drmProtectedPages = document.drm_protected_pages || []
+    
+    // drmProtected is always false - only specific pages in drmProtectedPages array are protected
     const drmProtected = false
 
     // Transform data to match expected format
@@ -177,7 +117,7 @@ serve(async (req) => {
           created_at: region.created_at
         })) || []
       },
-      pdfUrl: streamingPdfUrl
+      pdfUrl
     }
 
     return new Response(
