@@ -451,7 +451,17 @@ Analyze the student's question carefully. If they're asking for a specific works
       {!pageImage && (
         <div className="hidden">
           {pdfUrl && (
-            <Document file={pdfUrl}>
+            <Document 
+              file={pdfUrl}
+              options={{
+                // Enable Range Request support for progressive loading
+                disableRange: false,
+                disableStream: false,
+                // Optimize for streaming
+                cMapUrl: `//unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                cMapPacked: true,
+              }}
+            >
               <Page
                 pageNumber={parseInt(pageNumber)}
                 onLoadSuccess={onPageLoadSuccess}

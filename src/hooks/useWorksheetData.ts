@@ -25,7 +25,7 @@ export const useWorksheetData = (worksheetId: string) => {
         }
       }
 
-      // Use Supabase edge function to get both metadata and PDF URL
+      // Use Supabase edge function to get both metadata and streaming PDF URL
       const { data, error } = await supabase.functions.invoke('get-worksheet-data', {
         body: { worksheetId },
       });
@@ -38,6 +38,8 @@ export const useWorksheetData = (worksheetId: string) => {
         throw new Error('Invalid response from worksheet data function')
       }
 
+      // The pdfUrl from the edge function is already the streaming URL
+      // Format: https://bohxienpthilrfwktokd.supabase.co/functions/v1/get-worksheet-data?worksheetId=ID&stream=pdf
       return {
         meta: data.meta,
         pdfUrl: data.pdfUrl
