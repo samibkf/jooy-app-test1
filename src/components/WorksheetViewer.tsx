@@ -550,14 +550,6 @@ const WorksheetViewer: React.FC<WorksheetViewerProps> = ({
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading={null}
-          options={{
-            // Enable Range Request support for progressive loading
-            disableRange: false,
-            disableStream: false,
-            // Optimize for streaming
-            cMapUrl: `//unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-            cMapPacked: true,
-          }}
         >
           <Page
             pageNumber={pageIndex}
@@ -587,12 +579,6 @@ const WorksheetViewer: React.FC<WorksheetViewerProps> = ({
             <Document
               file={pdfUrl}
               className="clear-document"
-              options={{
-                disableRange: false,
-                disableStream: false,
-                cMapUrl: `//unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-                cMapPacked: true,
-              }}
             >
               <div
                 style={{
