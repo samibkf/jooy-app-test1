@@ -34,13 +34,17 @@ export const useWorksheetData = (worksheetId: string) => {
         throw new Error(`Failed to fetch worksheet: ${error.message}`)
       }
 
-      if (!data?.meta || !data?.pdfUrl) {
+      if (!data?.meta) {
         throw new Error('Invalid response from worksheet data function')
       }
 
+      // Construct the streaming PDF URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const streamingPdfUrl = `${supabaseUrl}/functions/v1/get-worksheet-data?worksheetId=${worksheetId}&stream=pdf`
+
       return {
         meta: data.meta,
-        pdfUrl: data.pdfUrl
+        pdfUrl: streamingPdfUrl
       }
     },
     enabled: !!worksheetId,

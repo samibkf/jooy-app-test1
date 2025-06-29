@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import WorksheetViewer from "@/components/WorksheetViewer";
+import PdfViewer from "@/components/PdfViewer";
 import AIChatButton from "@/components/AIChatButton";
 import { Button } from "@/components/ui/button";
 import { useWorksheetData } from "@/hooks/useWorksheetData";
@@ -292,7 +292,7 @@ const WorksheetPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <WorksheetViewer 
+      <PdfViewer 
         worksheetId={id} 
         pageIndex={pageIndex} 
         worksheetMeta={worksheetData.meta}
